@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
+from .labelme_tools import LabelMeMerger
+
 ValueType = Union[str, Path, None]
 RECTANGLE: str = "rectangle"
 POLYGON: str = "polygon"
@@ -179,15 +181,25 @@ class LabelmeToCOCO:
 
     def generate_json(self, img_list, save_dir):
         anno = self._init_json()
+        merger =  LabelMeMerger(self.merged_size)
         for i, img_path in enumerate(img_list):
+            anno_data = None
+            if merger.is_enabled:
+                merger.append(img_path)
+                if merger.is_merged:
+                    img_path, ann_data = merger.pack_results()
+                else:
+                    continue
             img_id = i + 1
-
+            
             new_img_name = f"{img_id:012d}{Path(img_path).suffix}"
             new_img_path = save_dir / new_img_name
             self.cp_file(img_path, new_img_path)
-
+            
+            merger.clean_up()
+            
             raw_json_path = img_path.with_suffix(".json")
-            raw_json_data = self.read_json(raw_json_path)
+            raw_json_data = anno_data if isinstance(anno_data, dict) else self.read_json(raw_json_path)
 
             img_h = raw_json_data.get("imageHeight")
             img_w = raw_json_data.get("imageWidth")
