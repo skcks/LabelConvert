@@ -14,14 +14,62 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from .labelme_tools import LabelMeMerger
+#from .labelme_tools import LabelMeMerger
 
 ValueType = Union[str, Path, None]
 RECTANGLE: str = "rectangle"
 POLYGON: str = "polygon"
 CIRCLE: str = "circle"
 
-
+class LabelMeMerger:
+    def __init__(self, merged_size: int =640):
+        self.is_enabled = len(merged_size)>0
+        self.is_merged = False
+        self._merged_size = merged_size
+        self.img_paths = []
+        self.img_annos = []
+        self.layout = []
+        self.row_width = 0
+        self.row_height = 0
+        self.col = 0
+        self.row = 0
+    def append(self, img_path):
+        json_path = img_path.with_suffix(".json")
+        json_data = None
+        with open(json_path, "r", encoding="utf-8") as f:
+            json_data = json.load(f)
+        if json_data is None:
+            return
+        self.img_paths.append(img_path)
+        self.img_annos.append(json_data)
+        w = int(json_data['imageWidth'])
+        h = int(json_data['imageHeight'])
+        if self.row_width + w <= self.merged_size and self.merged_height + h <= self.merged_size:
+            if self.row==0:
+                self.layout.append([])
+            self.layout[self.row].append(len(self.img_paths) - 1)
+            self.col += 1
+            self.row_width += w
+            self.row_height = math.max(self.row_height, h)
+        else:
+            self.row += 1
+            self.layout.append([])
+            self.col = 0
+            self.merged_width = math.max(self.merged_width, self.row_width)
+            self.merged_height += self.row_height
+            self.is_merged = self.merged_height + h > self.merged_size or w > self.merged_size
+            if not self.is_merged:  
+                self.layout[self.row].append(len(self.img_paths) - 1)
+                self.col+=1
+                self.row_width += w
+                self.row_height = math.max(self.row_height, h)
+        
+            
+    def pack_results(self):
+        pass
+        
+       
+       
 class LabelmeToCOCO:
     def __init__(
         self,
