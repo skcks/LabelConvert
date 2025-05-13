@@ -28,6 +28,7 @@ class LabelmeToCOCO:
         val_ratio: float = 0.2,
         have_test: bool = False,
         test_ratio: float = 0.2,
+        labels: list=[]
     ):
         if data_dir is None:
             raise ValueError("data_dir must not be None")
@@ -37,6 +38,7 @@ class LabelmeToCOCO:
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
         self.have_test = have_test
+        self.labels = labels
 
         self.verify_exists(self.data_dir)
 
@@ -147,26 +149,32 @@ class LabelmeToCOCO:
         return annotation_info
 
     def _get_category(self):
-        json_list = Path(self.data_dir).glob("*.json")
-        all_categories = []
-        for json_path in json_list:
-            json_info = self.read_json(json_path)
-            shapes = json_info.get("shapes", [])
-            all_categories.extend([v["label"] for v in shapes])
+        categories = []
+        st = 1
+        if self.labels is None or len(self.labels)==0:
+            json_list = Path(self.data_dir).glob("*.json")
+            all_categories = []
+            for json_path in json_list:
+                json_info = self.read_json(json_path)
+                shapes = json_info.get("shapes", [])
+                all_categories.extend([v["label"] for v in shapes])
 
-        categories = list(set(all_categories))
-        categories.sort(key=all_categories.index)
-
+            categories = list(set(all_categories))
+            categories.sort(key=all_categories.index)
+        else:
+            for label in self.labels:
+                categories.append(label)
+                st = 0 
         coco_categories = []
         for i, cls_name in enumerate(categories):
             coco_categories.append(
                 {
                     "supercategory": cls_name,
-                    "id": i + 1,
+                    "id": i + st,
                     "name": cls_name,
                 }
             )
-        self.cls_to_idx = {v: i + 1 for i, v in enumerate(categories)}
+        self.cls_to_idx = {v: i + st for i, v in enumerate(categories)}
         return coco_categories
 
     def generate_json(self, img_list, save_dir):
@@ -336,10 +344,11 @@ def main():
     parser.add_argument("--val_ratio", type=float, default=0.2)
     parser.add_argument("--have_test", action="store_true", default=False)
     parser.add_argument("--test_ratio", type=float, default=0.2)
+    parser.add_argument("--labels", nargs='*', default=[])
     args = parser.parse_args()
 
     converter = LabelmeToCOCO(
-        args.data_dir, args.save_dir, args.val_ratio, args.have_test, args.test_ratio
+            args.data_dir, args.save_dir, args.val_ratio, args.have_test, args.test_ratio, args.labels
     )
     converter()
 
